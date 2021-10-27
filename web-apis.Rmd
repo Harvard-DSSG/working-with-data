@@ -1,0 +1,148 @@
+---
+title: "Working with Web API Data in R"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+# Working with APIs in R
+Making HTTP requests to APIs from R can be really simple. The `httr` and `jsonlite` libraries are probably the most common tools for this process, so let's install and import those:
+
+```{r}
+install.packages(c("httr", "jsonlite"))
+library(httr)
+library(jsonlite)
+library(tidyverse)
+```
+
+## Authentication
+You'll have to authenticate each request to the Harvard Art Museum API with an API key. Other APIs may require different kinds of authentication (sometimes very complicated auth! Look for libraries at that point), but HAM has some pretty simple authentication, which makes things easy for us.
+
+You can sign up for a key [here](https://www.harvardartmuseums.org/collections/api). Documentation for the entire API is hosted on GitHub and can be viewed [here](https://github.com/harvardartmuseums/api-docs). It's quite a comprehensive series of docs, so you should check it out.
+
+Recently, the Art Museum also added an [API Tookit and Guide](https://api-toolkit.herokuapp.com/). This is another fantastic resource.
+
+Let's store our API key in a variable so we can reuse it easily:
+```{r}
+APIKEY <- "7afcead1-ec8e-4b3d-a329-b4b117624bf0"
+```
+
+## Basic Requests
+## Basic request
+
+We're going to start off with a basic request to the API. This API, like many others, has a variety of endpoints, each with their own url, slightly modified from a base url. We'll worry about the general case in a bit, for now let's look at a basic API request.
+
+In this example, we'll re-create the first example in the [Object endpoint documentation](https://github.com/harvardartmuseums/api-docs/blob/master/sections/object.md), which will give each of you the records for 10 objects that have never been viewed online in the museum's collections.
+
+```{r}
+# httr::set_config(httr::config(ssl_verifypeer = 0L)) 
+endpoint <- "https://api.harvardartmuseums.org/object"
+parameters <- list(
+  q = "totalpageviews:0",
+  size = 10,
+  apikey = APIKEY,
+  sort = "random"
+)
+request <- GET(url = endpoint, query = parameters)
+```
+
+We now have a request object, which includes a lot of data. Let's take a look:
+```{r}
+request
+```
+This shows us
+- the URL which `httr` created from the endpoint and the query parameters we provided
+- the date we received the response
+- the status of the response, which is hopefully 200. See more about [HTTP response codes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+- the content type of the response - JSON
+- and the size of the response
+
+We can check out the type of the object:
+```{r}
+typeof(request)
+```
+
+As a refresher: lists in R can have named elements. We can use that name as a key to access particular elements. There are also special methods for accessing some kinds of content, such as the HTTP status code, the headers, and the body content.
+```{r}
+print(paste("URL: ", request$url))
+print(paste("Status: ", status_code(request)))
+print("Headers:")
+headers(request)
+```
+
+We're interested in using the response data returned from our request. Let's check that out:
+```{r}
+response <- content(request, as = "text", encoding = "UTF-8")
+response
+```
+
+That's the data we want, but it's not going to be very easy to use in this format. Let's use `jsonlite` to turn it into a dataframe.
+
+```{r}
+df <- fromJSON(response, flatten = TRUE) %>% 
+  data.frame()
+```
+
+Now we have a dataframe, which is the preferred format to use within R for most applications. Let's package up this transformation snippet into a function.
+
+```{r}
+request_to_dataframe <- function(req){
+  res <- content(req, as = "text", encoding = "UTF-8")
+  df <- fromJSON(res, flatten = TRUE) %>% 
+    data.frame()
+  return(df)
+}
+```
+
+## Changing our request
+
+Let's say we're not interested in the most obscure parts of the collection, but rather in the most popular parts of the collection. There are a few ways we might go about doing this. One way might be to sort our search results by `totalpageviews`, and see what the top 10 are.
+
+To do that, we can go back to the [Object API documentation](https://github.com/harvardartmuseums/api-docs/blob/master/sections/object.md) and look for hints about what we might be able to do.
+
+```{r}
+params <- list(
+  apikey = APIKEY,
+  sortorder = "desc",
+  sort = "totalpageviews"
+) # add your query here
+request <- GET(url = endpoint, query = params)
+top_items_df <- request_to_dataframe(request)
+top_items_df
+```
+That's a lot of info. Let's try to get just the title, date, pageview count, and URL for each record.
+```{r}
+vars <- c("records.title", "records.dated", "records.totalpageviews", "records.url")
+top_items_small <- top_items_df[vars]
+top_items_small
+```
+
+The top result from this query is a Van Gogh painted titled "Self-Portrait Dedicated to Paul Gauguin." You can grab just the first object by accessing the records list (which is indexed from 0): Let's take a look at this most popular painting.
+```{r}
+topResult = top_items_df[1,]
+topResult
+```
+
+### Exercise
+- Try using the `person` endpoint to search for information about Van Gogh. Get his `id` number.
+- Try displaying all HAM works by Van Gogh using that `id`. Filter your results to only include records with an image associated.
+
+```{r}
+# Your code goes here
+# You will need to change the endpoint we've been using
+```
+
