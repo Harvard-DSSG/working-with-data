@@ -5,20 +5,6 @@ editor_options:
   chunk_output_type: inline
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
-```{r}
-plot(cars)
-```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
-
 # Working with APIs in R
 Making HTTP requests to APIs from R can be really simple. The `httr` and `jsonlite` libraries are probably the most common tools for this process, so let's install and import those:
 
@@ -38,11 +24,10 @@ Recently, the Art Museum also added an [API Tookit and Guide](https://api-toolki
 
 Let's store our API key in a variable so we can reuse it easily:
 ```{r}
-APIKEY <- "7afcead1-ec8e-4b3d-a329-b4b117624bf0"
+APIKEY <- ""
 ```
 
 ## Basic Requests
-## Basic request
 
 We're going to start off with a basic request to the API. This API, like many others, has a variety of endpoints, each with their own url, slightly modified from a base url. We'll worry about the general case in a bit, for now let's look at a basic API request.
 
@@ -125,6 +110,8 @@ request <- GET(url = endpoint, query = params)
 top_items_df <- request_to_dataframe(request)
 top_items_df
 ```
+
+### Looking at our Results
 That's a lot of info. Let's try to get just the title, date, pageview count, and URL for each record.
 ```{r}
 vars <- c("records.title", "records.dated", "records.totalpageviews", "records.url")
@@ -231,3 +218,86 @@ all_items
 
 ```
 
+## IIIF
+When we printed the 10 most popular records above (under **Looking at our Results**), you may have noticed a sharp dropoff after the first few records. Our Van Gogh painting is particularly popular, with ~10000 more views than the second most popular record and 4x as many as the tenth most popular. This particular Art Museum record is used as the default image asset for the demo installation of [Project Mirador](http://projectmirador.org/demo/), an image viewer for [IIIF (International Image Interoperability Framework)](https://iiif.io/) media assets. 
+
+We're not going to go deep into IIIF in this workshop, but want to mention that IIIF is both a community of developers and a collection of APIs and API-compliant tools that you can use to share, manipulate, and display visual materials. The [Image API](https://iiif.io/api/image/2.1/) and [Presentation API](https://iiif.io/api/presentation/2.1/) are the most used outputs as of now, though there are also APIs for Authentication, Search, and beta versions for other media (video and VR).
+
+Let's return to our top result, Van Gogh's "Self-Portrait Dedicated to Paul Gauguin", and look specifically at the `records.images` column:
+```{r}
+topResult$records.images
+```
+This particular record has 6 images associated with it. Try copying and pasting some of the `baseimageurl`s in your browser.
+
+You'll notice that the `baseimageurls` use Harvard's Name Resolution service, which redirects to an Image Delivery Service URL that displays the image. This is nice, but we're more interested in the iiifbaseuris because we can manipulate IIIF resources using the Image API. Try opening one of those. What happens?
+
+The IIIF Image API spec requires that we pass not just a baseurl, but a well-formed IIIF-compliant URI to get an image. Let's check out that [documentation](https://iiif.io/api/image/2.1/) and see what else we need to construct one of those.
+
+From the docs:
+
+>The IIIF Image API URI for requesting an image must conform to the following URI Template:
+>
+>`{scheme}://{server}{/prefix}/{identifier}/{region}/{size}/{rotation}/{quality}.{format}`
+>
+>For example:
+>
+>`http://www.example.org/image-service/abcd1234/full/full/0/default.jpg`
+>
+The parameters of the Image Request URI include region, size, rotation, quality and format, which define the characteristics of the returned image. These are described in detail in Image Request Parameters.
+
+The `iiifbaseuri`s include up through the `{identifier}`, but we need to include additional parameters to get the server to actually render the image for us. These parameters are passed within the URI itself, rather than in a query string appended after a delimiter (usually `?`), which is what we've been using `httr` to do. Let's write a function that can generate IIIF URIs for us.
+
+```{r}
+ham_iiif_query <- function(baseuri, region="full", size="full", rotation=0, quality="default", format="jpg"){
+  if(substr(baseuri, nchar(baseuri) - 2, nchar(baseuri)) != "/"){
+    baseuri <- paste(baseuri, "/", sep="")
+  }
+  url <- str_interp("${baseuri}${region}/${size}/${rotation}/${quality}.${format}")
+  return(url)
+}
+```
+
+```{r}
+ham_iiif_query("https://ids.lib.harvard.edu/ids/iiif/47174896")
+```
+
+You should be able to open that link in your browser. Let's try to use this function to display the images within our notebook:
+```{r}
+#install.packages("imager")
+#library("imager")
+van_gogh_images <- topResult$records.images[[1]]
+typeof(van_gogh_images)
+length(van_gogh_images)
+
+van_gogh_image_uris <- as.list(van_gogh_images$iiifbaseuri)
+for(iiif_uri in van_gogh_image_uris){
+  url <- ham_iiif_query(iiif_uri)
+  print(url)
+  img <- load.image(url)
+  plot(img)
+}
+```
+
+### IIIF Image API Exercise
+We can easily manipulate the images to via the IIIF image API. Let's try requesting only the right half of an image (using `region`), in black and white, scaled to 300px wide, and getting back a PNG:
+```{r}
+for(iiif_uri in van_gogh_image_uris){
+  url <- ham_iiif_query(iiif_uri, quality="bitonal", region="pct:50,0,50,100", format="png", size="300,")
+  print(url)
+  img <- load.image(url)
+  plot(img)
+}
+```
+### IIIF Presentation API
+
+If you're interested in the Presi API (for presenting structured IIIF resources as part of a more fully-functional web app), check out [this documentation](https://iiif.io/api/presentation/2.1/) to learn how IIIF manifests structure sequences of canvases which image viewers then present to end users. You can find an HAM Object's manifest in the `seeAlso` field, or by by appending the object ID to a baseurl:
+```{r}
+topResult$records.seeAlso
+str_interp("https://iiif.harvardartmuseums.org/manifests/object/${topResult['records.id']}")
+```
+
+#### Mirador
+
+You can consume these resources using [Mirador](http://projectmirador.org/), an image viewer which uses the IIIF Image and Presentation APIs.
+
+If you head to the [Project Mirador Demo](http://projectmirador.org/) page, you can add a new manifest in the top left ("four boxes icon" -> "Replace Object" -> "Add new object from URL"). You may notice that the Van Gogh is one of the example objects here, so let's instead add a manifest from our second most viewed painting, "The Gare Saint-Lazare: Arrival of a Train": https://iiif.harvardartmuseums.org/manifests/object/228649
