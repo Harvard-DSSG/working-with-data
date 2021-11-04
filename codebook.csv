@@ -1,0 +1,32 @@
+﻿Code,Field
+GISJOIN,GIS Join Match Code
+YEAR,Row Source Year
+STATE,NHGIS Integrated State Name
+STATEFP,FIPS State Code
+STATENH,NHGIS Integrated State Code
+COUNTY,NHGIS Integrated County Name
+COUNTYFP,FIPS County Code
+COUNTYNH,NHGIS Integrated County Code
+NAME,Year-Specific Area Name
+A57AA,Urban
+A57AB,Urban--Inside urbanized areas
+A57AC,Urban--Outside urbanized areas (in urban clusters)
+A57AD,Rural
+B57AA,Under 5 years
+B57AB,5 to 9 years
+B57AC,10 to 14 years
+B57AD,15 to 17 years
+B57AE,18 and 19 years
+B57AF,20 years
+B57AG,21 years
+B57AH,22 to 24 years
+B57AI,25 to 29 years
+B57AJ,30 to 34 years
+B57AK,35 to 44 years
+B57AL,45 to 54 years
+B57AM,55 to 59 years
+B57AN,60 and 61 years
+B57AO,62 to 64 years
+B57AP,65 to 74 years
+B57AQ,75 to 84 years
+B57AR,85 years and over
