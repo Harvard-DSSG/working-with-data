@@ -80,7 +80,7 @@ That's the data we want, but it's not going to be very easy to use in this forma
 ```{r}
 df <- fromJSON(response, flatten = TRUE) %>% 
   data.frame()
-# look into flatten
+df
 ```
 
 Now we have a dataframe, which is the preferred format to use within R for most applications. Let's package up this transformation snippet into a function.
@@ -103,9 +103,7 @@ To do that, we can go back to the [Object API documentation](https://github.com/
 ```{r}
 params <- list(
   apikey = APIKEY,
-  sortorder = "desc",
-  sort = "totalpageviews"
-) # add your query here
+) # ADD YOUR QUERY HERE
 request <- GET(url = endpoint, query = params)
 top_items_df <- request_to_dataframe(request)
 top_items_df
@@ -114,14 +112,14 @@ top_items_df
 ### Looking at our Results
 That's a lot of info. Let's try to get just the title, date, pageview count, and URL for each record.
 ```{r}
-vars <- c("records.title", "records.dated", "records.totalpageviews", "records.url")
-top_items_small <- top_items_df[vars]
+top_items_small <- top_items_df %>% select("records.title", "records.dated", "records.totalpageviews", "records.url")
 top_items_small
 ```
 
-The top result from this query is a Van Gogh painted titled "Self-Portrait Dedicated to Paul Gauguin." You can grab just the first object by accessing the records list (which is indexed from 0): Let's take a look at this most popular painting.
+The top result from this query is a Van Gogh painted titled "Self-Portrait Dedicated to Paul Gauguin." You can grab just the first object with the head() method, which returns the first row in the dataset, or by accessing the records list (which is indexed from 0). Let's take a look at this most popular painting.
 ```{r}
-topResult = top_items_df[1,]
+# topResult = top_items_df[1,] is another way of doing this - it says "get a sublist from the first index"
+head(topResult)
 topResult
 ```
 
@@ -139,70 +137,47 @@ topResult
 
 #### Get a list of all the medium types in the museum
 ```{r}
+# Your code goes here
 
 ```
 
-#### Find out all the exhibits currently being shown at the Harvard Art Museums
+#### Find out all the exhibits currently being shown at the Harvard Art Museums venue
 ```{r}
-endpoint = "https://api.harvardartmuseums.org/exhibition"
-params <- list(
-  apikey = APIKEY,
-  status = "current",
-  venue = "HAM"
-)
-request <- GET(url = endpoint, query = params)
-request
-exhibits_df <- request_to_dataframe(request)
-exhibits_df
+# Your code goes here
+
 ```
 
 #### Given the above, create a dataframe of all the objects currently being shown in these exhibits
 - Your dataframe should only have some fields: title, dated, total page views, accession year, classification, technique, medium, images
+- First, create a function which will get all of the objects from one exhibit. The function will need to page through the exhibit if there are multiple pages
+- Then, apply the function to all the exhibits
+- Return the dataframe from the function
 ```{r}
-# First, create a function which will get all of the objects from one exhibit
-# The function will need to page through the exhibit if there are multiple pages
-# Then, apply the function to all the exhibits
-
 get_exhibit_items <- function(exhibit_id){
   params <- list(
     apikey = APIKEY,
-    exhibition = exhibit_id,
-    size = 100,
-    fields = "title,dated,totalpageviews,accessionyear,classification,technique,medium,images",
-    sort = "totalpageviews",
-    sortorder = "desc"
+    # your query goes here
   )
   endpoint  = "https://api.harvardartmuseums.org/object"
   init_req <- GET(url = endpoint, query = params)
   init_req
   
+  # turn it into a dataframe
   df <- request_to_dataframe(init_req)
   
-  # There are some columns we would like to drop, as not every response as info.next / info.prev
-  # Some of the columns we want to keep are also not present on every response, namely records.seeAlso and records.images; rbind can't handle missing columns but dplyr::bind_rows() can
-  drops <- c("info.totalrecordsperquery", "info.totalrecords", "info.pages", "info.page", "info.prev", "info.next")
-  # required_cols <- c("records.images", "records.totalpageviews", "records.accessionyear", "records.permissionlevel", "records.technique", "records.dated", "records.id", "records.medium", "records.classification", "records.title", "records.seeAlso")
- 
-  df = df[ , !(names(df) %in% drops)]
-
-  parsed = content(init_req,"parsed")
-  next_link = parsed$info$`next`
-  # print(next_link)
+  # get rid of any column which starts with .info
   
-  while(is.character(next_link)){
-    req <- GET(next_link)
-    new_objects <- request_to_dataframe(req)
-    parsed <- content(req,"parsed")
-    new_objects = new_objects[ , !(names(new_objects) %in% drops)]
-    
-    # df <- rbind(df, new_objects)
-    # Use dplyr::bind_rows instead, because it handles missing columns: https://www.rdocumentation.org/packages/dplyr/versions/0.7.8/topics/bind
-    df <- bind_rows(df, new_objects)
-    
-    next_link <- parsed$info$`next`
-  }
+  # parse the init_req
   
-  return(df)
+  # get the next_link from the parsed init_req
+  
+  # if the next_link exists, loop through all of the other pages until it's gone
+  # in each iteration, parse the content and bind it to the existing dataframe (df) so it persists outside the loop
+  # get the next loop and continue
+  # hint: a while loop might be useful here
+  
+  # now return our dataframe df
+  
 }
 
 all_items = data.frame()
@@ -282,10 +257,7 @@ for(iiif_uri in van_gogh_image_uris){
 We can easily manipulate the images to via the IIIF image API. Let's try requesting only the right half of an image (using `region`), in black and white, scaled to 300px wide, and getting back a PNG:
 ```{r}
 for(iiif_uri in van_gogh_image_uris){
-  url <- ham_iiif_query(iiif_uri, quality="bitonal", region="pct:50,0,50,100", format="png", size="300,")
-  print(url)
-  img <- load.image(url)
-  plot(img)
+  # your code goes here
 }
 ```
 ### IIIF Presentation API
